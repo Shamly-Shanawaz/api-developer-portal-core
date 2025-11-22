@@ -82,27 +82,289 @@
   </script>
 </main>
 
-{{else if (eq apiType "GraphQL")}}
+{{else if (eq apiType "GRAPHQL")}}
 
+{{#if isGraphQLTryout}}
 <head>
-  <link rel="stylesheet" href="https://unpkg.com/graphiql@latest/graphiql.min.css">
-  <script src="https://unpkg.com/react@18.0.0/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18.0.0/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css">
+  <link rel="stylesheet" href="/libs/graphql-schema-viewer/vendor/graphiql-explorer/dist/style.css">
+  <style>
+    .graphql-tryout-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100vh;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    .graphql-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 16px;
+      border: 1px solid #d0d7de;
+      border-radius: 12px;
+      background: #f6f8fa;
+    }
+
+    .graphql-control {
+      flex: 1 1 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .graphql-control label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #57606a;
+    }
+
+    .graphql-control input {
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      color: #1f2328;
+      background: #fff;
+    }
+
+    .graphql-control .control-hint {
+      font-size: 12px;
+      color: #57606a;
+    }
+
+    .graphql-control .control-hint strong {
+      color: #1f2328;
+    }
+
+    .graphiql-container .graphiql-editor-tools {
+      display: none !important;
+    }
+
+    .graphiql-container .graphiql-session {
+      height: 100% !important;
+    }
+
+    .graphiql-container .graphiql-sidebar .graphiql-sidebar-section:last-of-type button {
+      display: none !important;
+    }
+
+    @media (max-width: 640px) {
+      .graphql-control input {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<main>
+  <div class="graphql-tryout-container">
+    <div class="graphql-controls" id="graphql-controls">
+      <div class="graphql-control">
+        <label for="graphql-endpoint-input">Endpoint URL</label>
+        <input id="graphql-endpoint-input" type="text" spellcheck="false" />
+        <div class="control-hint" id="graphql-endpoint-status"></div>
+      </div>
+      <div class="graphql-control">
+        <label for="graphql-token-input">Authorization Header</label>
+        <input id="graphql-token-input" type="text" placeholder="Bearer &lt;token&gt;" spellcheck="false" />
+        <div class="control-hint" id="graphql-token-status"></div>
+      </div>
+    </div>
+    <div id="root" style="flex: 1; min-height: 0;"></div>
+  </div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/graphiql@3/graphiql.min.js"></script>
+  <script src="/libs/graphql-schema-viewer/vendor/graphiql-explorer/dist/index.umd.js"></script>
+  <script id="graphql-schema-introspection-json" type="application/json">{{{graphqlSchemaAsIntrospectionJSON}}}</script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const apiEndpoint = '{{ apiMetadata.endPoints.productionURL }}';
+      const rootElement = document.getElementById('root');
+      rootElement.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: montserrat;">Loading GraphiQL...</div>';
+      
+      const endpointInput = document.getElementById('graphql-endpoint-input');
+      const endpointStatus = document.getElementById('graphql-endpoint-status');
+      const tokenInput = document.getElementById('graphql-token-input');
+      const tokenStatus = document.getElementById('graphql-token-status');
+      let currentEndpoint = apiEndpoint || '';
+      let authToken = '';
+
+      const updateEndpointStatus = () => {
+        if (!endpointStatus) {
+          return;
+        }
+        if (!currentEndpoint) {
+          endpointStatus.textContent = 'Endpoint is required';
+          endpointStatus.style.color = '#d1242f';
+          return;
+        }
+        endpointStatus.textContent = currentEndpoint;
+        endpointStatus.style.color = '#57606a';
+      };
+
+      const updateTokenStatus = () => {
+        if (!tokenStatus) {
+          return;
+        }
+        tokenStatus.textContent = authToken
+          ? 'Authorization header will be sent with each request'
+          : 'Header not set';
+        tokenStatus.style.color = authToken ? '#1f883d' : '#57606a';
+      };
+
+      if (endpointInput) {
+        endpointInput.value = apiEndpoint || '';
+        endpointInput.addEventListener('input', function (event) {
+          const value = (event.target.value || '').trim();
+          currentEndpoint = value || apiEndpoint || '';
+          updateEndpointStatus();
+        });
+      }
+
+      if (tokenInput) {
+        tokenInput.addEventListener('input', function (event) {
+          authToken = (event.target.value || '').trim();
+          updateTokenStatus();
+        });
+      }
+
+      updateEndpointStatus();
+      updateTokenStatus();
+
+      // Get schema data (stored SDL converted to introspection JSON format) from script tag
+      const schemaScript = document.getElementById('graphql-schema-introspection-json');
+      let schemaIntrospectionJSON = null;
+      
+      // Debug logging
+      console.log('=== GraphiQL Debug Info ===');
+      console.log('API Endpoint:', apiEndpoint);
+      console.log('Schema script found:', !!schemaScript);
+      console.log('GraphiQL loaded:', typeof GraphiQL !== 'undefined');
+      console.log('========================');
+      
+      // Parse schema introspection JSON (converted from stored SDL, not from server introspection)
+      try {
+        if (!schemaScript || !schemaScript.textContent || schemaScript.textContent.trim() === '' || schemaScript.textContent === 'null') {
+          rootElement.innerHTML = '<div style="padding: 20px; color: red;">Error: No schema definition found in database. Please ensure the GraphQL schema is properly saved.</div>';
+          return;
+        }
+        schemaIntrospectionJSON = JSON.parse(schemaScript.textContent);
+        console.log('✅ Schema introspection JSON loaded from database (converted from stored SDL)');
+      } catch (error) {
+        console.error('❌ Error parsing schema introspection JSON:', error);
+        rootElement.innerHTML = '<div style="padding: 20px; color: red;">Error parsing schema: ' + error.message + '</div>';
+        return;
+      }
+      
+      // Create fetcher for executing queries
+      const fetcher = async (graphQLParams) => {
+        try {
+          if (!currentEndpoint) {
+            throw new Error('Endpoint URL is required');
+          }
+          console.log('Executing GraphQL query to:', currentEndpoint);
+          console.log('Query params:', graphQLParams);
+          
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          };
+
+          if (authToken) {
+            headers['Authorization'] = authToken;
+          }
+
+          const response = await fetch(currentEndpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(graphQLParams),
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('GraphQL response error:', response.status, errorText);
+            return { 
+              errors: [{ 
+                message: `HTTP ${response.status}: ${errorText || response.statusText}` 
+              }] 
+            };
+          }
+          
+          const result = await response.json();
+          console.log('GraphQL response:', result);
+          return result;
+        } catch (error) {
+          console.error('GraphQL request error:', error);
+          return { 
+            errors: [{ 
+              message: `Network error: ${error.message}. Please check if the endpoint URL is correct and accessible.` 
+            }] 
+          };
+        }
+      };
+      
+      // Initialize Explorer plugin if available
+      let plugins = [];
+      if (typeof GraphiQLPluginExplorer !== 'undefined' && GraphiQLPluginExplorer.explorerPlugin) {
+        try {
+          const explorerPlugin = GraphiQLPluginExplorer.explorerPlugin();
+          plugins.push(explorerPlugin);
+          console.log('✅ Explorer plugin enabled');
+        } catch (error) {
+          console.warn('⚠️ Failed to initialize Explorer plugin:', error);
+        }
+      } else {
+        console.warn('⚠️ Explorer plugin not available');
+      }
+      
+      // Render GraphiQL with the schema introspection JSON (converted from stored SDL)
+      ReactDOM.render(React.createElement(GraphiQL, {
+        fetcher: fetcher,
+        schema: schemaIntrospectionJSON,
+        plugins: plugins.length > 0 ? plugins : undefined,
+        defaultEditorToolsVisibility: true
+      }), rootElement);
+    });
+  </script>
+</main>
+{{else}}
+<head>
 </head>
 <main>
   <div id="root" style="height: 100vh;"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="/libs/graphql-schema-viewer/dist/graphql-schema-viewer.umd.js"></script>
   <script>
-    const fetcher = GraphiQL.createFetcher({ url: '{{ apiMetadata.endPoints.productionURL }}' });
-    const rootElement = document.getElementById('root');
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(
-      React.createElement(GraphiQL, {
-        fetcher: fetcher,
-      })
-    );
+      document.addEventListener('DOMContentLoaded', function () {
+        const schemaData = `{{{graphql}}}`;
+        const apiMetadata = {
+          apiInfo: {
+            apiName: '{{apiMetadata.apiInfo.apiName}}',
+            apiVersion: '{{apiMetadata.apiInfo.apiVersion}}',
+            apiDescription: '{{apiMetadata.apiInfo.apiDescription}}'
+          },
+          endPoints: {
+            productionURL: '{{apiMetadata.endPoints.productionURL}}',
+            sandboxURL: '{{apiMetadata.endPoints.sandboxURL}}'
+          },
+          provider: '{{apiMetadata.provider}}'
+        };
+        const rootElement = document.getElementById('root');
+        rootElement.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: montserrat;">Loading GraphQL Schema Viewer...</div>';
+        ReactDOM.render(React.createElement(GraphQLSchemaViewer.default, {
+          schema: schemaData,
+          apiMetadata: apiMetadata
+        }), rootElement);
+      });
   </script>
 </main>
+{{/if}}
 
 {{else if (eq apiType "MCP")}}
 

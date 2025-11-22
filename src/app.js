@@ -413,6 +413,7 @@ passport.deserializeUser(async (sessionData, done) => {
 // });
 
 app.use(constants.ROUTE.TECHNICAL_STYLES, express.static(path.join(require.main.filename, '../styles')));
+app.use('/libs', express.static(path.join(process.cwd(), 'libs')));
 app.use(constants.ROUTE.TECHNICAL_SCRIPTS, express.static(path.join(require.main.filename, '../scripts')));
 
 //backend routes
